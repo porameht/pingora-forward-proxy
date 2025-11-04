@@ -1,4 +1,4 @@
-# Pingora IP Rotator
+# Pingora Forward Proxy
 
 Forward proxy with automatic IP rotation built on Cloudflare's Pingora framework.
 
