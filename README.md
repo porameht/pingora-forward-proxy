@@ -31,27 +31,24 @@ Your App → [Proxy: IP Rotator] → Target Website
 
 ## Quick Start
 
-### Installation
+### 1. Install Rust
 
 ```bash
-# Clone and deploy
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
+
+### 2. Clone & Build
+
+```bash
 git clone <repo> /opt/pingora-proxy
 cd /opt/pingora-proxy
-sudo bash deploy.sh
+cargo build --release
 ```
 
-### Configuration
+### 3. Configure IPs
 
-Edit `/opt/pingora-proxy/.env`:
-
-```bash
-IP_POOL=172.105.123.45,172.105.123.46,172.105.123.47
-PROXY_USER=your_username
-PROXY_PASS=your_password
-LISTEN_ADDR=0.0.0.0:7777
-```
-
-Add IPs to `/etc/netplan/01-netcfg.yaml`:
+Edit `/etc/netplan/01-netcfg.yaml`:
 
 ```yaml
 network:
@@ -64,9 +61,42 @@ network:
         - 172.105.123.47/24
 ```
 
+Apply network config:
 ```bash
 sudo netplan apply
+ip addr show eth0  # verify
+```
+
+### 4. Configure Proxy
+
+Copy and edit `.env`:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+```bash
+IP_POOL=172.105.123.45,172.105.123.46,172.105.123.47
+PROXY_USER=your_username
+PROXY_PASS=your_password
+LISTEN_ADDR=0.0.0.0:7777
+```
+
+### 5. Setup Service
+
+```bash
+sudo cp pingora-proxy.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable pingora-proxy
 sudo systemctl start pingora-proxy
+```
+
+### 6. Verify
+
+```bash
+sudo systemctl status pingora-proxy
+curl -x http://user:pass@localhost:7777 https://httpbin.org/ip
 ```
 
 ## How It Works
@@ -123,12 +153,32 @@ sudo journalctl -u pingora-proxy -f
 ## Project Structure
 
 ```
-src/main.rs              # Single file (269 lines)
-deploy.sh                # Auto deployment
-test-proxy.py            # Test IP rotation
+src/main.rs              # Main implementation (269 lines)
 .env.example             # Config template
+pingora-proxy.service    # Systemd service
+01-netcfg.yaml          # Network config example
 ```
 
+## Testing
+
+**Test single request:**
+```bash
+curl -x http://user:pass@proxy-ip:7777 https://httpbin.org/ip
+```
+
+**Test IP rotation:**
+```bash
+for i in {1..10}; do
+  curl -s -x http://user:pass@proxy-ip:7777 https://httpbin.org/ip | grep origin
+done
+# Should see different IPs rotating
+```
+
+**Test authentication:**
+```bash
+# Without auth - should fail with 407
+curl -v -x http://proxy-ip:7777 https://httpbin.org/ip
+```
 
 ## Troubleshooting
 
@@ -147,9 +197,6 @@ sudo grep IP_POOL .env
 
 # Check IPs are assigned
 ip addr show eth0
-
-# Test IP rotation
-for i in {1..5}; do curl -s -x http://user:pass@proxy-ip:7777 https://httpbin.org/ip; done
 ```
 
 ## Development
@@ -159,10 +206,13 @@ for i in {1..5}; do curl -s -x http://user:pass@proxy-ip:7777 https://httpbin.or
 cargo build --release
 
 # Run locally
-./run-local.sh
+export IP_POOL=127.0.0.1
+export PROXY_USER=test
+export PROXY_PASS=test123
+cargo run
 
-# Test
-python3 test-proxy.py localhost 7777 test test123 20
+# Test locally
+curl -x http://test:test123@localhost:7777 https://httpbin.org/ip
 ```
 
 ## Technical Details
