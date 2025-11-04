@@ -1,0 +1,26 @@
+[Unit]
+Description=Pingora Multi-IP Proxy Server
+Documentation=https://github.com/cloudflare/pingora
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pingora-proxy
+EnvironmentFile=/opt/pingora-proxy/.env
+ExecStart=/opt/pingora-proxy/target/release/pingora-proxy
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
